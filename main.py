@@ -4,7 +4,7 @@ import yfinance as yf
 import matplotlib.pyplot as plt
 
 from trading_env import TradingEnv
-from ppo_agent import PPOAgent
+from ppo_agent_long_only import PPOAgent
 
 
 def download_data(tickers, start, end):
@@ -122,20 +122,6 @@ def run_experiment():
         plt.title(f"Equity Curves - {period_name}")
         plt.xlabel("Time Step")
         plt.ylabel("Portfolio Value")
-        plt.legend()
-        plt.grid(True)
-        plt.tight_layout()
-        plt.show()
-
-        # Plot actions
-        plt.figure(figsize=(12, 4))
-        for reward_type in reward_types:
-            actions = results[period_name][reward_type]['actions']
-            mean_alloc = [np.mean(a) for a in actions]
-            plt.plot(mean_alloc, label=reward_type)
-        plt.title(f"Mean Portfolio Allocation per Step - {period_name}")
-        plt.xlabel("Time Step")
-        plt.ylabel("Mean Asset Allocation")
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
