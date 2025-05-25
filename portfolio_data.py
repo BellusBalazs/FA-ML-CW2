@@ -25,7 +25,7 @@ initial_investment = 1000
 # Calculate portfolio value over time
 portfolio_value = cumulative_returns * initial_investment
 
-# Plot the portfolio value
+# --- Plot 1: Portfolio value ---
 plt.figure(figsize=(10, 6))
 plt.plot(portfolio_value, label='Equally Weighted Portfolio Value')
 plt.title('Portfolio Value of Equally Weighted Portfolio (2015–2025)')
@@ -35,4 +35,18 @@ plt.legend()
 plt.grid(True)
 plt.tight_layout()
 plt.show()
-    
+
+# --- Plot 2: Normalized stock prices ---
+normalized_prices = data / data.iloc[0]  # Normalize to 1 at start
+
+plt.figure(figsize=(12, 7))
+for ticker in tickers:
+    plt.plot(normalized_prices[ticker], label=ticker)
+
+plt.title('Normalized Stock Prices (2015–2025)')
+plt.xlabel('Date')
+plt.ylabel('Normalized Price (Start = 1)')
+plt.legend(loc='upper left')
+plt.grid(True)
+plt.tight_layout()
+plt.show()
