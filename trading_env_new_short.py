@@ -15,7 +15,7 @@ class TradingEnv(gym.Env):
         self.initial_balance = initial_balance
         self.reward_type = reward_type
 
-        # Action space: portfolio weights for each asset [0, 1]
+        # Action space: portfolio weights for each asset, from -1 (fully short) to +1 (fully long)
         self.action_space = spaces.Box(low=-1, high=1, shape=(self.n_assets,), dtype=np.float32)
 
         # Observation space: recent price/volume window
@@ -36,6 +36,7 @@ class TradingEnv(gym.Env):
         self.balance = self.initial_balance
         self.current_step = self.window_size
         self.done = False
+        # Start equally weighted long portfolio by default
         self.weights = np.ones(self.n_assets) / self.n_assets
         self.equity_curve = [self.balance]
         return self._get_obs()
@@ -46,14 +47,27 @@ class TradingEnv(gym.Env):
         return window.astype(np.float32)
 
     def step(self, action):
-        # Normalize actions to sum to 1 for portfolio allocation
-        action = np.clip(action, 0, 1)
-        self.weights = action / (np.sum(action) + 1e-8)
+        # Clip action to allowed range [-1, 1]
+        action = np.clip(action, -1, 1)
 
-        # Calculate portfolio return based on Close prices
+        # Normalize absolute sum of weights to be <= 1 (max total exposure)
+        abs_sum = np.sum(np.abs(action)) + 1e-8
+        if abs_sum > 1:
+            weights = action / abs_sum
+        else:
+            weights = action  # if sum(abs(weights)) < 1, cash is held for the rest
+
+        self.weights = weights
+
+        # Cash weight is residual
+        cash_weight = 1 - np.sum(np.abs(weights))
+
+        # Get asset returns for this step
         adj_close = self.df.xs('Close', axis=1, level=1)
         asset_returns = adj_close.pct_change().iloc[self.current_step].values
-        portfolio_return = np.dot(self.weights, asset_returns)
+
+        # Portfolio return = weighted asset returns + cash return (0)
+        portfolio_return = np.dot(weights, asset_returns) + cash_weight * 0
 
         # Update balance
         prev_balance = self.balance
@@ -81,7 +95,8 @@ class TradingEnv(gym.Env):
 
         obs = self._get_obs()
         info = {}
+
         return obs, reward, self.done, info
 
     def render(self, mode='human'):
-        print(f"Step: {self.current_step}, Balance: {self.balance:.2f}, Weights: {self.weights}")
+        print(f"Step: {self.current_step}, Balance: {self.balance:.2f}, Weights: {self.weights}, Cash weight: {1 - np.sum(np.abs(self.weights)):.4f}")

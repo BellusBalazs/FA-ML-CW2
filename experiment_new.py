@@ -41,8 +41,8 @@ def run_experiment():
     window_size = 10
     total_timesteps = 30000  # reduced for speed but still meaningful
 
-    # reward_types = ['basic', 'utility', 'risk_penalty', 'drawdown_penalty']
-    reward_types = ['basic']  # you can add others if you want
+    reward_types = ['basic', 'utility', 'risk_penalty', 'drawdown_penalty']
+    #reward_types = ['basic']  # you can add others if you want
     results = {}
 
     for reward_type in reward_types:
@@ -146,20 +146,25 @@ def run_experiment():
     plt.tight_layout()
     plt.show()
 
-    # Plot weights over time for each reward type
     for reward_type, res in results.items():
+        window = 20
         weights = res['weights_over_time']
+        smoothed_weights = pd.DataFrame(weights, columns=tickers).rolling(window=window, min_periods=1).mean().values
+
         plt.figure(figsize=(14, 7))
-        for i in range(weights.shape[1]):
-            plt.plot(weights[:, i], label=f'Asset {tickers[i]}')
-        plt.title(f'Portfolio Weights Over Time ({reward_type})')
+        plt.stackplot(
+            range(smoothed_weights.shape[0]),
+            smoothed_weights.T,
+            labels=[f'Asset {t}' for t in tickers],
+            alpha=0.8
+        )
+        plt.title(f'Smoothed Portfolio Weights Over Time ({reward_type})')
         plt.xlabel('Time Step')
         plt.ylabel('Weight')
-        plt.legend()
-        plt.grid()
+        plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+        plt.grid(True)
         plt.tight_layout()
         plt.show()
-
 
 if __name__ == "__main__":
     run_experiment()
