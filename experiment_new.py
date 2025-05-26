@@ -6,7 +6,8 @@ import time
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from trading_env_new import TradingEnv
+from portfolio_data import tickers
+from trading_env_new_long import TradingEnv
 
 
 def download_data(tickers, start, end):
@@ -26,30 +27,32 @@ def compute_sharpe(returns):
 
 
 def run_experiment():
-    tickers = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG', 'HD', 'BA', 'NEM', 'NEE', 'AMT']
-    start_date = '2020-05-25'
-    end_date = '2025-05-25'
+    tickers = ['SPY', 'EFA', 'TLT', 'GLD', 'BTC-USD']
+    start_date = '2015-01-01'
+    end_date = '2025-01-01'
+    split_date = '2021-01-01'  # train before this, test after this
 
-    df = download_data(tickers, start_date, end_date)
-
-    # Clean data
+    df = download_data(tickers, start=start_date, end=end_date)
     df = df.dropna(how='all').ffill().bfill()
     valid_mask = df.notna().all(axis=1)
     valid_dates = df.index[valid_mask]
     df = df.loc[valid_dates[0]:valid_dates[-1]]
 
+    # Split into train/test
+    df_train = df[df.index < split_date]
+    df_test = df[df.index >= split_date]
+
     window_size = 10
-    total_timesteps = 30000  # reduced for speed but still meaningful
+    total_timesteps = 30000
 
     reward_types = ['basic', 'utility', 'risk_penalty', 'drawdown_penalty']
-    #reward_types = ['basic']  # you can add others if you want
     results = {}
 
     for reward_type in reward_types:
         print(f"\n=== Starting training with reward_type = '{reward_type}' ===")
         start_time = time.time()
 
-        env = DummyVecEnv([lambda: TradingEnv(df, window_size=window_size, reward_type=reward_type)])
+        env = DummyVecEnv([lambda: TradingEnv(df_train, window_size=window_size, reward_type=reward_type)])
 
         model = PPO(
             "MlpPolicy",
@@ -63,7 +66,7 @@ def run_experiment():
             seed=42,
         )
 
-        # Simple progress logging callback for training
+        # Logging progress
         class ProgressCallback:
             def __init__(self, total_steps, log_interval=5000):
                 self.total_steps = total_steps
@@ -86,7 +89,7 @@ def run_experiment():
         print(f"Training finished in {training_time:.1f} seconds.")
 
         # Test phase
-        test_env = TradingEnv(df, window_size=window_size, reward_type=reward_type)
+        test_env = TradingEnv(df_test, window_size=window_size, reward_type=reward_type)
         obs = test_env.reset()
         done = False
         equity_curve = [test_env.balance]
@@ -96,11 +99,6 @@ def run_experiment():
         while not done:
             action, _ = model.predict(obs, deterministic=True)
 
-            # DEBUG: print action shape & content once (optional)
-            if step == 0:
-                print(f"Action shape: {action.shape}, action: {action}")
-
-            # Append weights robustly depending on shape
             if len(action.shape) == 1:
                 weights_over_time.append(action)
             else:
@@ -113,7 +111,6 @@ def run_experiment():
                 print(f"Testing progress ({reward_type}): Step {step}, Balance: {test_env.balance:.2f}")
 
         weights_over_time = np.array(weights_over_time)
-
         portfolio_returns = np.diff(equity_curve) / equity_curve[:-1]
         sharpe = compute_sharpe(portfolio_returns)
 
@@ -126,19 +123,19 @@ def run_experiment():
 
         print(f"Reward: {reward_type} | Sharpe ratio: {sharpe:.3f}\n")
 
-    # Plot all equity curves together
+    # Plot all equity curves
     plt.figure(figsize=(14, 7))
     for reward_type, res in results.items():
         plt.plot(res['equity_curve'], label=f'{reward_type} (Sharpe: {res["sharpe"]:.2f})')
 
-    # Benchmark: equal weighted buy & hold
-    adj_close = df.xs('Close', axis=1, level=1)
+    # Benchmark
+    adj_close = df_test.xs('Close', axis=1, level=1)
     returns_df = adj_close.pct_change().dropna()
     equally_weighted_returns = returns_df.mean(axis=1)
     benchmark_equity = (1 + equally_weighted_returns).cumprod() * 1000
     plt.plot(benchmark_equity.values, 'k--', label='Buy & Hold Equally Weighted')
 
-    plt.title('Portfolio Equity Curve Comparison')
+    plt.title('Portfolio Equity Curve Comparison (Test Period Only)')
     plt.xlabel('Time Step')
     plt.ylabel('Portfolio Value')
     plt.legend()
@@ -146,6 +143,7 @@ def run_experiment():
     plt.tight_layout()
     plt.show()
 
+    # Plot smoothed weights
     for reward_type, res in results.items():
         window = 20
         weights = res['weights_over_time']
@@ -155,7 +153,7 @@ def run_experiment():
         plt.stackplot(
             range(smoothed_weights.shape[0]),
             smoothed_weights.T,
-            labels=[f'Asset {t}' for t in tickers],
+            labels=[f'{t}' for t in tickers],
             alpha=0.8
         )
         plt.title(f'Smoothed Portfolio Weights Over Time ({reward_type})')
@@ -165,6 +163,7 @@ def run_experiment():
         plt.grid(True)
         plt.tight_layout()
         plt.show()
+
 
 if __name__ == "__main__":
     run_experiment()

@@ -3,7 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Define the tickers and the time period
-tickers = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG', 'HD', 'BA', 'NEM', 'NEE', 'AMT']
+
+tickers = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG']
 start_date = '2015-05-25'
 end_date = '2025-05-25'
 

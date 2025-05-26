@@ -4,7 +4,7 @@ import numpy as np
 import time
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
-from trading_env_new import TradingEnv  # adjust if needed
+from trading_env_new_long import TradingEnv  # adjust if needed
 
 
 def download_data(tickers, start, end):
@@ -23,6 +23,7 @@ def compute_sharpe(returns):
     return mean_return / (std_return + 1e-8) * np.sqrt(252)
 
 
+
 def evaluate_model(model, env):
     obs = env.reset()
     done = False
@@ -37,7 +38,6 @@ def evaluate_model(model, env):
     sharpe = compute_sharpe(portfolio_returns)
     return sharpe
 
-
 def run_hyperparameter_search():
     tickers = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG']
     start_date = '2020-01-01'
@@ -49,9 +49,14 @@ def run_hyperparameter_search():
     valid_dates = df.index[valid_mask]
     df = df.loc[valid_dates[0]:valid_dates[-1]]
 
+    # Split dates for train/test split, e.g., 80% train, 20% test
+    split_idx = int(len(df) * 0.8)
+    train_df = df.iloc[:split_idx]
+    test_df = df.iloc[split_idx:]
+
     window_size = 10
 
-    # 3 options each for hyperparameters
+    # Hyperparameter grids
     learning_rates = [1e-4, 3e-4, 1e-3]
     ent_coefs = [0.0, 0.01, 0.05]
     clip_ranges = [0.1, 0.2, 0.3]
@@ -69,7 +74,8 @@ def run_hyperparameter_search():
                 for gamma in gammas:
                     print(f"\nTesting params: lr={lr}, ent_coef={ent_coef}, clip_range={clip_range}, gamma={gamma}")
 
-                    env = DummyVecEnv([lambda: TradingEnv(df, window_size=window_size, reward_type='basic')])
+                    # Train environment on training data only
+                    env = DummyVecEnv([lambda: TradingEnv(train_df, window_size=window_size, reward_type='basic')])
 
                     model = PPO(
                         "MlpPolicy",
@@ -86,7 +92,8 @@ def run_hyperparameter_search():
 
                     model.learn(total_timesteps=total_timesteps)
 
-                    test_env = TradingEnv(df, window_size=window_size, reward_type='basic')
+                    # Evaluate model on test data only
+                    test_env = TradingEnv(test_df, window_size=window_size, reward_type='basic')
                     sharpe = evaluate_model(model, test_env)
                     print(f"Sharpe ratio: {sharpe:.4f}")
 
@@ -102,7 +109,6 @@ def run_hyperparameter_search():
     print("\n=== Best Hyperparameters ===")
     print(f"Best Sharpe Ratio: {best_sharpe:.4f}")
     print(best_params)
-
 
 if __name__ == "__main__":
     start_time = time.time()
