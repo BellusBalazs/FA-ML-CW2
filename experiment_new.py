@@ -27,7 +27,8 @@ def compute_sharpe(returns):
 
 
 def run_experiment():
-    tickers = ['SPY', 'EFA', 'TLT', 'GLD', 'BTC-USD']
+    tickers = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG', 'HD', 'BA', 'NEM', 'NEE', 'AMT']
+
     start_date = '2015-01-01'
     end_date = '2025-01-01'
     split_date = '2021-01-01'  # train before this, test after this

@@ -3,9 +3,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
-from trading_env_new_long import TradingEnv
+from stable_baselines3.common.callbacks import BaseCallback
+
+from trading_env_new_long import TradingEnv  # Make sure this path matches your env
 
 
 def download_data(tickers, start, end):
@@ -24,6 +27,17 @@ def compute_sharpe(returns):
     return mean_return / (std_return + 1e-8) * np.sqrt(252)
 
 
+class LoggingCallback(BaseCallback):
+    def __init__(self, log_interval=5000, verbose=1):
+        super().__init__(verbose)
+        self.log_interval = log_interval
+
+    def _on_step(self) -> bool:
+        if self.n_calls % self.log_interval == 0:
+            print(f"Step: {self.n_calls}")
+        return True
+
+
 def run_single_experiment(tickers, train_start, train_end, test_start, test_end, label):
     print(f"\n=== Running Experiment: {label} ===")
     df_full = download_data(tickers, start=train_start, end=test_end)
@@ -40,7 +54,6 @@ def run_single_experiment(tickers, train_start, train_end, test_start, test_end,
     total_timesteps = 30000
 
     reward_types = ['basic', 'utility', 'risk_penalty', 'drawdown_penalty']
-
     results = {}
 
     for reward_type in reward_types:
@@ -59,7 +72,7 @@ def run_single_experiment(tickers, train_start, train_end, test_start, test_end,
             seed=42,
         )
 
-        model.learn(total_timesteps=total_timesteps)
+        model.learn(total_timesteps=total_timesteps, callback=LoggingCallback(log_interval=5000))
 
         # Test phase
         test_env = TradingEnv(df_test, window_size=window_size, reward_type=reward_type)
@@ -87,14 +100,17 @@ def run_single_experiment(tickers, train_start, train_end, test_start, test_end,
 
     # Plot all equity curves for this experiment
     plt.figure(figsize=(12, 6))
+    min_len = min([len(res['equity_curve']) for res in results.values()])
+
     for rt, res in results.items():
-        plt.plot(res['equity_curve'], label=f'{rt} (Sharpe: {res["sharpe"]:.2f})')
+        plt.plot(res['equity_curve'][:min_len], label=f'{rt} (Sharpe: {res["sharpe"]:.2f})')
 
     adj_close = df_test.xs('Close', axis=1, level=1)
     returns_df = adj_close.pct_change().dropna()
     equal_weight_returns = returns_df.mean(axis=1)
     benchmark = (1 + equal_weight_returns).cumprod() * 1000
-    plt.plot(benchmark.values, 'k--', label='Buy & Hold Equally Weighted')
+    benchmark = benchmark.values[:min_len]  # Match RL equity curve length
+    plt.plot(benchmark, 'k--', label='Buy & Hold Equally Weighted')
 
     plt.title(f'Equity Curve Comparison: {label}')
     plt.xlabel('Time Step')
@@ -105,7 +121,7 @@ def run_single_experiment(tickers, train_start, train_end, test_start, test_end,
     plt.show()
 
     # Plot weights for each reward type
-    window = 10
+    window = 20
     for rt, res in results.items():
         weights_smooth = pd.DataFrame(res['weights'], columns=tickers).rolling(window=window, min_periods=1).mean().values
         plt.figure(figsize=(14, 6))
@@ -125,28 +141,36 @@ def run_single_experiment(tickers, train_start, train_end, test_start, test_end,
 
 
 def run_all_experiments():
-    tickers = ['SPY', 'EFA', 'TLT', 'GLD', 'BTC-USD']
+    tickers = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG', 'HD', 'BA', 'NEM', 'NEE', 'AMT']
 
-    # COVID Crash Period (Short Crisis Test)
+
+
+    """
+      # COVID Crash Period (Short Crisis Test)
     run_single_experiment(
         tickers=tickers,
-        train_start='2017-01-01',
+        train_start='2018-01-01',
         train_end='2020-02-14',
         test_start='2020-02-15',
         test_end='2020-04-15',
         label='COVID Crash Period'
     )
+    
+    """
 
-    # Bull Market Year 2023
+    # Example: Bull Market 2023–24
     run_single_experiment(
         tickers=tickers,
-        train_start='2018-01-01',
-        train_end='2022-12-31',
-        test_start='2023-01-01',
-        test_end='2023-12-31',
-        label='Bull Market 2023'
+        train_start='2022-01-01',
+        train_end='2024-05-31',
+        test_start='2024-06-01',
+        test_end='2024-08-01',
+        label='Bull Market 2024'
     )
 
 
 if __name__ == "__main__":
     run_all_experiments()
+
+
+

@@ -4,9 +4,10 @@ import matplotlib.pyplot as plt
 
 # Define the tickers and the time period
 
-tickers = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG']
-start_date = '2015-05-25'
-end_date = '2025-05-25'
+tickers = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG', 'HD', 'BA', 'NEM', 'NEE', 'AMT']
+
+start_date = '2021-01-01'
+end_date = '2025-01-01'
 
 # Download adjusted close price data
 data = yf.download(tickers, start=start_date, end=end_date, auto_adjust=True)['Close']
