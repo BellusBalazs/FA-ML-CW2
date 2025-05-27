@@ -56,6 +56,14 @@ def run_single_experiment(tickers, train_start, train_end, test_start, test_end,
     reward_types = ['basic', 'utility', 'risk_penalty', 'drawdown_penalty']
     results = {}
 
+    best_params = {
+        "window_size": 10,
+        "learning_rate": 0.00021576169455803155,
+        "ent_coef": 0.027528106725391587,
+        "clip_range": 0.15054203145138187,
+        "gamma": 0.9967781574066088,
+    }
+
     for reward_type in reward_types:
         print(f"\n--- Training with reward type: {reward_type} ---")
         env = DummyVecEnv([lambda: TradingEnv(df_train, window_size=window_size, reward_type=reward_type)])
@@ -63,12 +71,13 @@ def run_single_experiment(tickers, train_start, train_end, test_start, test_end,
         model = PPO(
             "MlpPolicy",
             env,
-            verbose=0,
+            learning_rate=best_params["learning_rate"],
+            ent_coef=best_params["ent_coef"],
+            clip_range=best_params["clip_range"],
+            gamma=best_params["gamma"],
             batch_size=64,
             n_steps=1024,
-            learning_rate=3e-4,
-            ent_coef=0.01,
-            clip_range=0.2,
+            verbose=0,
             seed=42,
         )
 
@@ -139,13 +148,28 @@ def run_single_experiment(tickers, train_start, train_end, test_start, test_end,
         plt.tight_layout()
         plt.show()
 
+    # Print summary performance table
+    print("\n=== Summary of Performance Across Reward Types ===")
+    summary_data = {
+        "Reward Type": [],
+        "Sharpe Ratio": [],
+        "Training Time (s)": []
+    }
+
+    for reward_type, res in results.items():
+        summary_data["Reward Type"].append(reward_type)
+        summary_data["Sharpe Ratio"].append(round(res['sharpe'], 4))
+        summary_data["Training Time (s)"].append(round(res['training_time'], 2))
+
+    summary_df = pd.DataFrame(summary_data)
+    print(summary_df.to_string(index=False))
+
+
+
 
 def run_all_experiments():
     tickers = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG', 'HD', 'BA', 'NEM', 'NEE', 'AMT']
 
-
-
-    """
       # COVID Crash Period (Short Crisis Test)
     run_single_experiment(
         tickers=tickers,
@@ -155,8 +179,6 @@ def run_all_experiments():
         test_end='2020-04-15',
         label='COVID Crash Period'
     )
-    
-    """
 
     # Example: Bull Market 2023–24
     run_single_experiment(

@@ -5,9 +5,10 @@ import matplotlib.pyplot as plt
 import time
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
-
+from scipy.stats import ttest_ind
 from portfolio_data import tickers
 from trading_env_new_long import TradingEnv
+
 
 
 def download_data(tickers, start, end):
@@ -24,7 +25,6 @@ def compute_sharpe(returns):
     mean_return = np.mean(returns)
     std_return = np.std(returns)
     return mean_return / (std_return + 1e-8) * np.sqrt(252)
-
 
 def run_experiment():
     tickers = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG', 'HD', 'BA', 'NEM', 'NEE', 'AMT']
@@ -49,25 +49,64 @@ def run_experiment():
     reward_types = ['basic', 'utility', 'risk_penalty', 'drawdown_penalty']
     results = {}
 
+    # Define best hyperparameters per reward type
+    best_params_map = {
+        "basic": {
+            "window_size": 10,
+            "learning_rate": 0.0003781883305632542,
+            "ent_coef": 0.0029601365379751574,
+            "clip_range": 0.2808970044622227,
+            "gamma": 0.9916943747451629,
+            "batch_size": 96,
+        },
+        "utility": {
+            "window_size": 10,
+            "learning_rate": 0.0005857771202038145,
+            "ent_coef": 0.00013946547206372564,
+            "clip_range": 0.13242027579299662,
+            "gamma": 0.9873288747259636,
+            "batch_size": 128,
+        },
+        "risk_penalty": {
+            "window_size": 10,
+            "learning_rate": 0.0007244999961292659,
+            "ent_coef": 0.005664041210269082,
+            "clip_range": 0.19428946199026847,
+            "gamma": 0.9775287191580475,
+            "batch_size": 32,
+        },
+        "drawdown_penalty": {
+            "window_size": 10,
+            "learning_rate": 0.00030996579474128487,
+            "ent_coef": 0.0001339889565950314,
+            "clip_range": 0.2399693801816262,
+            "gamma": 0.969700160687714,
+            "batch_size": 64,
+        },
+    }
+
     for reward_type in reward_types:
         print(f"\n=== Starting training with reward_type = '{reward_type}' ===")
         start_time = time.time()
 
-        env = DummyVecEnv([lambda: TradingEnv(df_train, window_size=window_size, reward_type=reward_type)])
+        # Use the right window_size for env from best params
+        params = best_params_map[reward_type]
+        env = DummyVecEnv(
+            [lambda: TradingEnv(df_train, window_size=params["window_size"], reward_type=reward_type)])
 
         model = PPO(
             "MlpPolicy",
             env,
-            verbose=0,
-            batch_size=64,
+            learning_rate=params["learning_rate"],
+            ent_coef=params["ent_coef"],
+            clip_range=params["clip_range"],
+            gamma=params["gamma"],
+            batch_size=params["batch_size"],
             n_steps=1024,
-            learning_rate=3e-4,
-            ent_coef=0.01,
-            clip_range=0.2,
+            verbose=0,
             seed=42,
         )
 
-        # Logging progress
         class ProgressCallback:
             def __init__(self, total_steps, log_interval=5000):
                 self.total_steps = total_steps
@@ -90,7 +129,7 @@ def run_experiment():
         print(f"Training finished in {training_time:.1f} seconds.")
 
         # Test phase
-        test_env = TradingEnv(df_test, window_size=window_size, reward_type=reward_type)
+        test_env = TradingEnv(df_test, window_size=params["window_size"], reward_type=reward_type)
         obs = test_env.reset()
         done = False
         equity_curve = [test_env.balance]
@@ -100,12 +139,15 @@ def run_experiment():
         while not done:
             action, _ = model.predict(obs, deterministic=True)
 
+            # Normalize weights to sum to 1
             if len(action.shape) == 1:
-                weights_over_time.append(action)
+                weights = action / (np.sum(action) + 1e-8)
+                weights_over_time.append(weights)
             else:
-                weights_over_time.append(action[0])
+                weights = action[0] / (np.sum(action[0]) + 1e-8)
+                weights_over_time.append(weights)
 
-            obs, reward, done, _ = test_env.step(action)
+            obs, reward, done, _ = test_env.step(weights)
             equity_curve.append(test_env.balance)
             step += 1
             if step % 50 == 0 or done:
@@ -123,6 +165,8 @@ def run_experiment():
         }
 
         print(f"Reward: {reward_type} | Sharpe ratio: {sharpe:.3f}\n")
+
+    # ... rest of your code unchanged
 
     # Plot all equity curves
     plt.figure(figsize=(14, 7))
@@ -164,6 +208,58 @@ def run_experiment():
         plt.grid(True)
         plt.tight_layout()
         plt.show()
+
+
+    # Calculate benchmark stats
+    benchmark_returns = equally_weighted_returns.values
+    benchmark_eq = benchmark_equity.values
+    benchmark_cum_return = (benchmark_eq[-1] / benchmark_eq[0]) - 1
+    benchmark_volatility = np.std(benchmark_returns) * np.sqrt(252)
+    benchmark_sharpe = compute_sharpe(benchmark_returns)
+
+    # Summary table
+    print("\n=== Summary of Performance Across Reward Types and Benchmark ===")
+    summary_data = {
+        "Reward Type": [],
+        "Sharpe Ratio": [],
+        "Cumulative Return": [],
+        "Volatility": [],
+        "Training Time (s)": [],
+        "T-stat (vs B&H)": [],
+        "p-value": [],
+    }
+
+    for reward_type, res in results.items():
+        eq = np.array(res['equity_curve'])
+        returns = np.diff(eq) / eq[:-1]
+        cum_return = eq[-1] / eq[0] - 1
+        volatility = np.std(returns) * np.sqrt(252)
+        sharpe = compute_sharpe(returns)
+
+        # t-test against benchmark
+        min_len = min(len(returns), len(benchmark_returns))
+        t_stat, p_val = ttest_ind(returns[:min_len], benchmark_returns[:min_len], equal_var=False)
+
+        summary_data["Reward Type"].append(reward_type)
+        summary_data["Sharpe Ratio"].append(round(sharpe, 4))
+        summary_data["Cumulative Return"].append(round(cum_return, 4))
+        summary_data["Volatility"].append(round(volatility, 4))
+        summary_data["Training Time (s)"].append(round(res['training_time'], 2))
+        summary_data["T-stat (vs B&H)"].append(round(t_stat, 4))
+        summary_data["p-value"].append(round(p_val, 4))
+
+    # Add benchmark row
+    summary_data["Reward Type"].append("Buy & Hold")
+    summary_data["Sharpe Ratio"].append(round(benchmark_sharpe, 4))
+    summary_data["Cumulative Return"].append(round(benchmark_cum_return, 4))
+    summary_data["Volatility"].append(round(benchmark_volatility, 4))
+    summary_data["Training Time (s)"].append("-")
+    summary_data["T-stat (vs B&H)"].append("-")
+    summary_data["p-value"].append("-")
+
+    # Print table
+    summary_df = pd.DataFrame(summary_data)
+    print(summary_df.to_string(index=False))
 
 
 if __name__ == "__main__":

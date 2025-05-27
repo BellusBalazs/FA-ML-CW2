@@ -2,18 +2,31 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import time
+import matplotlib.pyplot as plt
+import optuna
+
+from optuna.pruners import MedianPruner
+
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
-from trading_env_new_long import TradingEnv  # adjust if needed
+from trading_env_new_long import TradingEnv
+
+# === CONFIGURATION === #
+TICKERS = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG', 'HD', 'BA', 'NEM', 'NEE', 'AMT']
+START_DATE = '2015-01-01'
+END_DATE = '2025-01-01'
+SPLIT_DATE = '2021-01-01'
+
+TOTAL_TIMESTEPS = 5000
+N_TRIALS = 30
+REWARD_TYPES = ['basic', 'utility', 'risk_penalty', 'drawdown_penalty']
 
 
 def download_data(tickers, start, end):
     raw = yf.download(tickers, start=start, end=end, group_by='ticker', auto_adjust=True)
-    panel = {}
-    for ticker in tickers:
-        panel[ticker] = raw[ticker][['High', 'Low', 'Close', 'Volume']]
+    panel = {ticker: raw[ticker][['High', 'Low', 'Close', 'Volume']] for ticker in tickers}
     df = pd.concat(panel.values(), axis=1, keys=panel.keys())
-    return df.ffill()
+    return df.ffill().bfill()
 
 
 def compute_sharpe(returns):
@@ -23,94 +36,131 @@ def compute_sharpe(returns):
     return mean_return / (std_return + 1e-8) * np.sqrt(252)
 
 
-
-def evaluate_model(model, env):
+def evaluate_model(model, env, max_steps=1000):
     obs = env.reset()
     done = False
     equity_curve = [env.balance]
+    step_count = 0
 
-    while not done:
+    while not done and step_count < max_steps:
         action, _ = model.predict(obs, deterministic=True)
         obs, reward, done, _ = env.step(action)
         equity_curve.append(env.balance)
+        step_count += 1
 
-    portfolio_returns = np.diff(equity_curve) / equity_curve[:-1]
-    sharpe = compute_sharpe(portfolio_returns)
-    return sharpe
+    returns = np.diff(equity_curve) / equity_curve[:-1]
+    sharpe = compute_sharpe(returns)
+    return sharpe, equity_curve, model.policy.state_dict()
 
-def run_hyperparameter_search():
-    tickers = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG']
-    start_date = '2020-01-01'
-    end_date = '2024-01-01'
 
-    df = download_data(tickers, start_date, end_date)
-    df = df.dropna(how='all').ffill().bfill()
-    valid_mask = df.notna().all(axis=1)
-    valid_dates = df.index[valid_mask]
-    df = df.loc[valid_dates[0]:valid_dates[-1]]
+def plot_equity(equity_curve, label):
+    plt.figure(figsize=(10, 5))
+    plt.plot(equity_curve, label=label)
+    plt.title(f"Equity Curve - {label}")
+    plt.xlabel("Steps")
+    plt.ylabel("Portfolio Value")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
 
-    # Split dates for train/test split, e.g., 80% train, 20% test
-    split_idx = int(len(df) * 0.8)
-    train_df = df.iloc[:split_idx]
-    test_df = df.iloc[split_idx:]
 
-    window_size = 10
+def tune_for_reward_type(reward_type, train_df, test_df):
+    print(f"\n Starting tuning for reward type: {reward_type}")
 
-    # Hyperparameter grids
-    learning_rates = [1e-4, 3e-4, 1e-3]
-    ent_coefs = [0.0, 0.01, 0.05]
-    clip_ranges = [0.1, 0.2, 0.3]
-    gammas = [0.95, 0.98, 0.99]
+    def objective(trial):
+        window_size = trial.suggest_categorical("window_size", [10, 30, 50, 100])
+        learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-3)
+        ent_coef = trial.suggest_loguniform("ent_coef", 1e-5, 0.05)
+        clip_range = trial.suggest_uniform("clip_range", 0.1, 0.3)
+        gamma = trial.suggest_uniform("gamma", 0.95, 0.999)
+        batch_size = trial.suggest_categorical("batch_size", [32, 64, 96, 128])
 
-    total_timesteps = 5000  # smaller for speed
-    batch_size = 64
+        env = DummyVecEnv([lambda: TradingEnv(train_df, window_size=window_size, reward_type=reward_type)])
+        model = PPO(
+            "MlpPolicy",
+            env,
+            learning_rate=learning_rate,
+            ent_coef=ent_coef,
+            clip_range=clip_range,
+            gamma=gamma,
+            batch_size=batch_size,
+            n_steps=1024,
+            verbose=0,
+            seed=42
+        )
 
-    best_sharpe = -np.inf
-    best_params = None
+        model.learn(total_timesteps=TOTAL_TIMESTEPS)
+        test_env = TradingEnv(test_df, window_size=window_size, reward_type=reward_type)
+        sharpe, _, _ = evaluate_model(model, test_env)
 
-    for lr in learning_rates:
-        for ent_coef in ent_coefs:
-            for clip_range in clip_ranges:
-                for gamma in gammas:
-                    print(f"\nTesting params: lr={lr}, ent_coef={ent_coef}, clip_range={clip_range}, gamma={gamma}")
+        trial.report(sharpe, step=0)
 
-                    # Train environment on training data only
-                    env = DummyVecEnv([lambda: TradingEnv(train_df, window_size=window_size, reward_type='basic')])
+        if trial.should_prune():
+            raise optuna.exceptions.TrialPruned()
 
-                    model = PPO(
-                        "MlpPolicy",
-                        env,
-                        verbose=0,
-                        batch_size=batch_size,
-                        n_steps=1024,
-                        learning_rate=lr,
-                        ent_coef=ent_coef,
-                        clip_range=clip_range,
-                        gamma=gamma,
-                        seed=42,
-                    )
+        return sharpe
 
-                    model.learn(total_timesteps=total_timesteps)
+    study = optuna.create_study(direction="maximize", pruner=MedianPruner(n_startup_trials=10, n_warmup_steps=0))
+    study.optimize(objective, n_trials=N_TRIALS, show_progress_bar=False)
 
-                    # Evaluate model on test data only
-                    test_env = TradingEnv(test_df, window_size=window_size, reward_type='basic')
-                    sharpe = evaluate_model(model, test_env)
-                    print(f"Sharpe ratio: {sharpe:.4f}")
+    print(f"Best Sharpe for {reward_type}: {study.best_value:.4f}")
+    print("Best Hyperparameters:")
+    for k, v in study.best_params.items():
+        print(f"  {k}: {v}")
 
-                    if sharpe > best_sharpe:
-                        best_sharpe = sharpe
-                        best_params = {
-                            'learning_rate': lr,
-                            'ent_coef': ent_coef,
-                            'clip_range': clip_range,
-                            'gamma': gamma
-                        }
+    # Train best model fully for final evaluation and weights
+    best_params = study.best_params
+    env = DummyVecEnv([lambda: TradingEnv(train_df, window_size=best_params['window_size'], reward_type=reward_type)])
+    model = PPO(
+        "MlpPolicy",
+        env,
+        learning_rate=best_params['learning_rate'],
+        ent_coef=best_params['ent_coef'],
+        clip_range=best_params['clip_range'],
+        gamma=best_params['gamma'],
+        batch_size=best_params['batch_size'],
+        n_steps=1024,
+        verbose=0,
+        seed=42
+    )
+    model.learn(total_timesteps=TOTAL_TIMESTEPS)
 
-    print("\n=== Best Hyperparameters ===")
-    print(f"Best Sharpe Ratio: {best_sharpe:.4f}")
-    print(best_params)
+    final_env = TradingEnv(test_df, window_size=best_params['window_size'], reward_type=reward_type)
+    sharpe, equity_curve, final_weights = evaluate_model(model, final_env)
+
+    print(f"Final Sharpe (re-evaluated) for {reward_type}: {sharpe:.4f}")
+    print(f"Final policy weights snapshot (sample):")
+    # Just print first layer weights or a small snippet for brevity
+    for name, param in final_weights.items():
+        print(f"  {name}: {param.flatten()[:5]} ...")
+        break
+
+    # Optionally plot equity curve for each reward type
+    plot_equity(equity_curve, f"Reward: {reward_type}")
+
+    return {
+        "reward_type": reward_type,
+        "sharpe": sharpe,
+        "best_params": best_params,
+        "final_weights": final_weights,
+        "equity_curve": equity_curve,
+    }
+
 
 if __name__ == "__main__":
     start_time = time.time()
-    run_hyperparameter_search()
-    print(f"\nTotal tuning time: {time.time() - start_time:.1f} seconds")
+
+    print("Downloading data...")
+    df = download_data(TICKERS, START_DATE, END_DATE)
+    df = df.dropna(how='any')
+
+    train_df = df.loc[:SPLIT_DATE]
+    test_df = df.loc[SPLIT_DATE:]
+
+    results = {}
+
+    for rt in REWARD_TYPES:
+        results[rt] = tune_for_reward_type(rt, train_df, test_df)
+
+    print(f"\n Total tuning time: {time.time() - start_time:.2f} seconds")

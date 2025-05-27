@@ -38,12 +38,13 @@ class TradingEnv(gym.Env):
         self.done = False
         self.weights = np.ones(self.n_assets) / self.n_assets
         self.equity_curve = [self.balance]
+
         return self._get_obs()
 
     def _get_obs(self):
-        # Return last `window_size` rows for all features flattened for all assets
-        window = self.df.iloc[self.current_step - self.window_size:self.current_step].values
-        return window.astype(np.float32)
+        # Get the current observation window
+        window = self.df.iloc[self.current_step - self.window_size:self.current_step]
+        return window
 
     def step(self, action):
         # Normalize actions to sum to 1 for portfolio allocation

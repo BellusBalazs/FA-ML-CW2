@@ -1,0 +1,125 @@
+Original Params:
+
+        """
+        model = PPO(
+            "MlpPolicy",
+            env,
+            verbose=0,
+            batch_size=64,
+            n_steps=1024,
+            learning_rate=3e-4,
+            ent_coef=0.01,
+            clip_range=0.2,
+            seed=42,
+        )
+        """
+
+
+
+Best Sharpe for basic: 1.1139
+Best Hyperparameters:
+  window_size: 10
+  learning_rate: 0.0003781883305632542
+  ent_coef: 0.0029601365379751574
+  clip_range: 0.2808970044622227
+  gamma: 0.9916943747451629
+  batch_size: 96
+Final Sharpe (re-evaluated) for basic: 1.1139
+Final policy weights snapshot (sample):
+  log_std: tensor([ 0.0163, -0.0376,  0.0089, -0.0040,  0.0174]) ...
+
+
+Best Sharpe for utility: 1.0638
+Best Hyperparameters:
+  window_size: 10
+  learning_rate: 0.0005857771202038145
+  ent_coef: 0.00013946547206372564
+  clip_range: 0.13242027579299662
+  gamma: 0.9873288747259636
+  batch_size: 128
+Final Sharpe (re-evaluated) for utility: 1.0638
+Final policy weights snapshot (sample):
+  log_std: tensor([ 0.0107, -0.0292,  0.0211, -0.0003,  0.0014]) ...
+
+
+Best Sharpe for risk_penalty: 1.3568
+Best Hyperparameters:
+  window_size: 10
+  learning_rate: 0.0007244999961292659
+  ent_coef: 0.005664041210269082
+  clip_range: 0.19428946199026847
+  gamma: 0.9775287191580475
+  batch_size: 32
+[I 2025-05-27 20:22:03,371] Trial 29 finished with value: 1.001131544288388 and parameters: {'window_size': 10, 'learning_rate': 0.00014696670997853593, 'ent_coef': 0.00022959485138006441, 'clip_range': 0.2462953188763778, 'gamma': 0.9799326768226543, 'batch_size': 32}. Best is trial 24 with value: 1.3567927724448907.
+Final Sharpe (re-evaluated) for risk_penalty: 1.3568
+Final policy weights snapshot (sample):
+  log_std: tensor([ 0.0241, -0.0269,  0.0101,  0.0395,  0.0591]) ...
+
+Best Sharpe for drawdown_penalty: 1.0860
+Best Hyperparameters:
+  window_size: 10
+  learning_rate: 0.00030996579474128487
+  ent_coef: 0.0001339889565950314
+  clip_range: 0.2399693801816262
+  gamma: 0.969700160687714
+  batch_size: 64
+Final Sharpe (re-evaluated) for drawdown_penalty: 1.0860
+Final policy weights snapshot (sample):
+  log_std: tensor([-0.0442,  0.0091,  0.0004, -0.0113,  0.0229]) ...
+
+⏱️ Total tuning time: 3995.19 seconds
+
+Process finished with exit code 0
+
+
+# === Best parameters and results per reward type === #
+
+best_params_basic = {
+    "window_size": 10,
+    "learning_rate": 0.0003781883305632542,
+    "ent_coef": 0.0029601365379751574,
+    "clip_range": 0.2808970044622227,
+    "gamma": 0.9916943747451629,
+    "batch_size": 96,
+}
+best_sharpe_basic = 1.1139
+final_policy_weights_basic = "log_std: tensor([ 0.0163, -0.0376,  0.0089, -0.0040,  0.0174]) ..."
+
+
+best_params_utility = {
+    "window_size": 10,
+    "learning_rate": 0.0005857771202038145,
+    "ent_coef": 0.00013946547206372564,
+    "clip_range": 0.13242027579299662,
+    "gamma": 0.9873288747259636,
+    "batch_size": 128,
+}
+best_sharpe_utility = 1.0638
+final_policy_weights_utility = "log_std: tensor([ 0.0107, -0.0292,  0.0211, -0.0003,  0.0014]) ..."
+
+
+best_params_risk_penalty = {
+    "window_size": 10,
+    "learning_rate": 0.0007244999961292659,
+    "ent_coef": 0.005664041210269082,
+    "clip_range": 0.19428946199026847,
+    "gamma": 0.9775287191580475,
+    "batch_size": 32,
+}
+best_sharpe_risk_penalty = 1.3568
+final_policy_weights_risk_penalty = "log_std: tensor([ 0.0241, -0.0269,  0.0101,  0.0395,  0.0591]) ..."
+
+
+best_params_drawdown_penalty = {
+    "window_size": 10,
+    "learning_rate": 0.00030996579474128487,
+    "ent_coef": 0.0001339889565950314,
+    "clip_range": 0.2399693801816262,
+    "gamma": 0.969700160687714,
+    "batch_size": 64,
+}
+best_sharpe_drawdown_penalty = 1.0860
+final_policy_weights_drawdown_penalty = "log_std: tensor([-0.0442,  0.0091,  0.0004, -0.0113,  0.0229]) ..."
+
+
+print(f"⏱️ Total tuning time: 3995.19 seconds")
