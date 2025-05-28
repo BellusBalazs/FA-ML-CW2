@@ -10,6 +10,9 @@ from optuna.pruners import MedianPruner
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 from trading_env_new_long import TradingEnv
+import logging
+optuna.logging.set_verbosity(logging.WARNING)
+
 
 # === CONFIGURATION === #
 TICKERS = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG', 'HD', 'BA', 'NEM', 'NEE', 'AMT']
@@ -17,8 +20,8 @@ START_DATE = '2015-01-01'
 END_DATE = '2025-01-01'
 SPLIT_DATE = '2021-01-01'
 
-TOTAL_TIMESTEPS = 5000
-N_TRIALS = 30
+TOTAL_TIMESTEPS = 30000
+N_TRIALS = 60
 REWARD_TYPES = ['basic', 'utility', 'risk_penalty', 'drawdown_penalty']
 
 

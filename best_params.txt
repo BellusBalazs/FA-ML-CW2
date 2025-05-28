@@ -123,3 +123,105 @@ final_policy_weights_drawdown_penalty = "log_std: tensor([-0.0442,  0.0091,  0.0
 
 
 print(f"⏱️ Total tuning time: 3995.19 seconds")
+
+
+Deep Best Params:
+
+Best Sharpe for basic: 1.5861
+Best Hyperparameters:
+  window_size: 10
+  learning_rate: 0.0001762567350121054
+  ent_coef: 0.0118790788482689
+  clip_range: 0.2908832095279642
+  gamma: 0.9761926816366329
+  batch_size: 64
+Final Sharpe (re-evaluated) for basic: 1.5861
+Final policy weights snapshot (sample):
+  log_std: tensor([ 0.0473,  0.0428,  0.0764,  0.0727, -0.0447]) ...
+
+ Starting tuning for reward type: utility
+Best Sharpe for utility: 1.4702
+Best Hyperparameters:
+  window_size: 10
+  learning_rate: 0.0002389048846840678
+  ent_coef: 0.048373283840031055
+  clip_range: 0.2704201915180821
+  gamma: 0.9568950634378731
+  batch_size: 32
+Final Sharpe (re-evaluated) for utility: 1.4702
+Final policy weights snapshot (sample):
+  log_std: tensor([0.4182, 0.3250, 0.4483, 0.4040, 0.3016]) ...
+
+ Starting tuning for reward type: risk_penalty
+Best Sharpe for risk_penalty: 1.3263
+Best Hyperparameters:
+  window_size: 10
+  learning_rate: 0.0008850460708364331
+  ent_coef: 0.04914900810017212
+  clip_range: 0.20342306858544182
+  gamma: 0.9632027187399644
+  batch_size: 32
+Final Sharpe (re-evaluated) for risk_penalty: 1.3263
+Final policy weights snapshot (sample):
+  log_std: tensor([1.0201, 1.0261, 1.0251, 1.0497, 1.0152]) ...
+
+ Starting tuning for reward type: drawdown_penalty
+Best Sharpe for drawdown_penalty: 1.4436
+Best Hyperparameters:
+  window_size: 10
+  learning_rate: 0.00031535366573213526
+  ent_coef: 0.046960179684158325
+  clip_range: 0.15935358452354417
+  gamma: 0.9930812511324987
+  batch_size: 32
+Final Sharpe (re-evaluated) for drawdown_penalty: 1.4436
+Final policy weights snapshot (sample):
+  log_std: tensor([0.3384, 0.4638, 0.4744, 0.4167, 0.4594]) ...
+
+ Total tuning time: 32962.35 seconds
+
+Process finished with exit code 0
+
+
+
+
+
+=== Summary of Performance Across Reward Types and Benchmark ===
+     Reward Type  Sharpe Ratio  Cumulative Return  Volatility T-stat (vs B&H) p-value
+           basic        4.8355             0.1166      0.1958          0.6019  0.5504
+         utility        4.9520             0.1202      0.1968          0.6423  0.5241
+    risk_penalty        4.7156             0.0872      0.1516          0.2951  0.7691
+drawdown_penalty        6.4763             0.1164      0.1447          0.7343  0.4661
+      Buy & Hold        4.7083             0.0768      0.0994               -       -
+
+
+
+=== Summary of Performance Across Reward Types and Benchmark ===
+     Reward Type  Sharpe Ratio  Cumulative Return  Volatility T-stat (vs B&H) p-value
+           basic       -1.7410            -0.2136      0.9354         -0.0102  0.9919
+         utility       -1.2353            -0.1705      0.9434          0.1113  0.9118
+    risk_penalty       -1.5013            -0.1761      0.8623          0.0812  0.9356
+drawdown_penalty       -0.7124            -0.1252      0.9662          0.2333  0.8164
+      Buy & Hold       -0.8044            -0.1366      0.7875               -
+
+
+
+      === Summary of Performance Across Reward Types and Benchmark WITH TC ===
+     Reward Type  Sharpe Ratio  Cumulative Return  Volatility Training Time (s) T-stat (vs B&H) p-value
+           basic        1.1978             1.0094      0.1582            105.35          0.7085  0.4787
+         utility        1.2100             1.0486      0.1610            104.79          0.7506   0.453
+    risk_penalty        1.3069             1.4012      0.1828            136.94          1.0702  0.2847
+drawdown_penalty        1.1576             1.0605      0.1710            116.16          0.7531  0.4515
+      Buy & Hold        0.7234             0.4423      0.1474                 -               -       -
+
+Process finished with exit code 0
+
+=== Summary of Performance Across Reward Types and Benchmark ===
+     Reward Type  Sharpe Ratio  Cumulative Return  Volatility Training Time (s) T-stat (vs B&H) p-value
+           basic        1.2934             1.1105      0.1558            109.83          0.8262  0.4088
+         utility        1.0638             0.8298      0.1554            104.64          0.4911  0.6234
+    risk_penalty        1.3809             1.3625      0.1681            138.14          1.0644  0.2873
+drawdown_penalty        1.1147             1.0019      0.1710            112.29          0.6887  0.4911
+      Buy & Hold        0.7234             0.4423      0.1474                 -               -       -
+
+Process finished with exit code 0

@@ -4,7 +4,14 @@ import matplotlib.pyplot as plt
 
 # Define the tickers and the time period
 
-tickers = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG', 'HD', 'BA', 'NEM', 'NEE', 'AMT']
+# Diversified Tickers
+#tickers = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG', 'HD', 'BA', 'NEM', 'NEE', 'AMT']
+
+# Momentum Tickers
+#tickers = ["AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "NFLX", "PYPL", "AVGO", "GOOG"]
+
+# Defence Tickers
+tickers = ["NEE", "DUK", "SO", "JNJ", "PG", "KO", "PEP", "WMT", "VZ", "O"]
 
 start_date = '2021-01-01'
 end_date = '2025-01-01'
@@ -30,7 +37,7 @@ portfolio_value = cumulative_returns * initial_investment
 # --- Plot 1: Portfolio value ---
 plt.figure(figsize=(10, 6))
 plt.plot(portfolio_value, label='Equally Weighted Portfolio Value')
-plt.title('Portfolio Value of Equally Weighted Portfolio (2015–2025)')
+plt.title('Portfolio Value of Equally Weighted Portfolio (2015–2025) DEFENSE')
 plt.xlabel('Date')
 plt.ylabel('Portfolio Value ($)')
 plt.legend()

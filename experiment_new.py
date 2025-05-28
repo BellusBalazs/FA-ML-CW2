@@ -7,7 +7,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 from scipy.stats import ttest_ind
 from portfolio_data import tickers
-from trading_env_new_long import TradingEnv
+from trading_env_new_long_with_tc import TradingEnv
 
 
 
@@ -27,7 +27,15 @@ def compute_sharpe(returns):
     return mean_return / (std_return + 1e-8) * np.sqrt(252)
 
 def run_experiment():
-    tickers = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG', 'HD', 'BA', 'NEM', 'NEE', 'AMT']
+    #Diversified Tickers
+    #tickers = ['AAPL', 'JNJ', 'XOM', 'JPM', 'PG', 'HD', 'BA', 'NEM', 'NEE', 'AMT']
+
+    #Momentum Tickers
+    #tickers = ["AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "NFLX", "PYPL", "AVGO", "GOOG"]
+
+    #Defence Tickers
+    tickers = ["NEE",  "DUK", "SO", "JNJ", "PG", "KO", "PEP", "WMT", "VZ", "O"]
+
 
     start_date = '2015-01-01'
     end_date = '2025-01-01'
@@ -166,7 +174,6 @@ def run_experiment():
 
         print(f"Reward: {reward_type} | Sharpe ratio: {sharpe:.3f}\n")
 
-    # ... rest of your code unchanged
 
     # Plot all equity curves
     plt.figure(figsize=(14, 7))
